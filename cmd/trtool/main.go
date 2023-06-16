@@ -21,6 +21,7 @@ func main() {
 		Subcommands: []*ffcli.Command{
 			app.Verify(),
 			app.Tsa(),
+			app.InitRoot(),
 		},
 		Exec: func(context.Context, []string) error {
 			return flag.ErrHelp

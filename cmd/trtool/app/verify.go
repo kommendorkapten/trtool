@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/peterbourgon/ff/v3/ffcli"
 	"github.com/sigstore/protobuf-specs/gen/pb-go/trustroot/v1"
@@ -50,23 +51,40 @@ func VerifyCmd(b []byte, verbose bool) error {
 		return err
 	}
 
-	for _, ca := range trustRoot.CertificateAuthorities {
-		if this := VerifyCertChain(ca, verbose); !this {
-			valid = false
-		}
-	}
-
-	for _, ca := range trustRoot.TimestampAuthorities {
-		if this := VerifyCertChain(ca, verbose); !this {
-			valid = false
-		}
-	}
+	valid = VerifyCertChains(trustRoot.CertificateAuthorities, verbose)
+	valid = VerifyCertChains(trustRoot.TimestampAuthorities, verbose) && valid
 
 	if !valid {
 		return errors.New("verification failed")
 	}
 
 	return nil
+}
+
+func VerifyCertChains(cas []*v1.CertificateAuthority, verbose bool) bool {
+	var valid = true
+	var prev *v1.CertificateAuthority
+
+	for _, ca := range cas {
+		if ok := VerifyCertChain(ca, verbose); !ok {
+			valid = false
+		}
+		// Verify the order. They SHOULD be orderd from oldes to
+		// newest (active)
+		if prev != nil {
+			if ca.ValidFor.Start.AsTime().Before(prev.ValidFor.Start.AsTime()) {
+				fmt.Printf("WARING: %s [%s] should be listed after %s [%s]\n",
+					ca.Uri,
+					ca.ValidFor.Start.AsTime().Format(time.RFC3339),
+					prev.Uri,
+					prev.ValidFor.Start.AsTime().Format(time.RFC3339),
+				)
+			}
+		}
+		prev = ca
+	}
+
+	return valid
 }
 
 func VerifyCertChain(ca *v1.CertificateAuthority, verbose bool) bool {
@@ -91,6 +109,10 @@ func VerifyCertChain(ca *v1.CertificateAuthority, verbose bool) bool {
 		// Verify that the CA's start time is equal to or later than
 		// the certificate's not before.
 		if c.NotBefore.After(ca.ValidFor.Start.AsTime()) {
+			fmt.Printf("Error verifying certificate: %s\n", c.Subject.CommonName)
+			fmt.Printf("Bundle's validity.start %s\n", ca.ValidFor.Start.AsTime())
+			fmt.Printf("Certificate's not before %s\n", c.NotBefore)
+
 			fmt.Println("Certificate's 'not before' must be before the CA's validity time as specified in the bundle")
 			valid = false
 		}
@@ -118,8 +140,8 @@ func VerifyCertChain(ca *v1.CertificateAuthority, verbose bool) bool {
 		if child != nil {
 			// Verify the chain.
 			// The order is leaf, intermediate(*), root
-			// So when verifying a cert, make sure that the previous
-			// certificate was signed by the current one.
+			// So when verifying a cert, make sure that the
+			// previous certificate was signed by the current one.
 			if child.Issuer.Organization[0] != c.Subject.Organization[0] {
 				fmt.Printf("Found issuer organization '%s', expected '%s'\n",
 					child.Issuer.Organization[0],
@@ -135,12 +157,18 @@ func VerifyCertChain(ca *v1.CertificateAuthority, verbose bool) bool {
 				valid = false
 			}
 			if len(child.AuthorityKeyId) != len(c.SubjectKeyId) {
-				fmt.Printf("Unexpected authority key id")
+				fmt.Printf("Unexpected authority key id\n")
 				valid = false
 			}
 			for i := range child.AuthorityKeyId {
+				if i >= len(c.SubjectKeyId) {
+					fmt.Printf("WARNING: missing SubjectKeyId on %s\n",
+						c.Subject.CommonName,
+					)
+					break
+				}
 				if child.AuthorityKeyId[i] != c.SubjectKeyId[i] {
-					fmt.Printf("Unexpected authority key id")
+					fmt.Printf("Unexpected authority key id\n")
 					valid = false
 					break
 				}

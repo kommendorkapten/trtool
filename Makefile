@@ -1,5 +1,5 @@
 .PHONY: trtool
-certtool:
+trtool:
 	go build -o trtool ./cmd/trtool
 
 .PHONY: vet
