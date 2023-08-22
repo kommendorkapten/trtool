@@ -56,6 +56,8 @@ func VerifyCmd(b []byte, verbose bool) error {
 
 	if !valid {
 		return errors.New("verification failed")
+	} else if verbose {
+		fmt.Println("Trusted root is valid")
 	}
 
 	return nil
