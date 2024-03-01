@@ -20,7 +20,7 @@ func main() {
 		FlagSet:    rootFlagSet,
 		Subcommands: []*ffcli.Command{
 			app.Verify(),
-			app.Tsa(),
+			app.Add(),
 			app.InitRoot(),
 		},
 		Exec: func(context.Context, []string) error {
