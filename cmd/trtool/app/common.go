@@ -79,7 +79,8 @@ func loadChain(p string, verbose bool) ([]*x509.Certificate, error) {
 	var block *pem.Block
 
 	if b, err = os.ReadFile(p); err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to load pem file: %w", err)
+
 	}
 
 	for {
@@ -120,13 +121,15 @@ func loadChain(p string, verbose bool) ([]*x509.Certificate, error) {
 // to be reversed.
 func orderCertChain(certs []*x509.Certificate) ([]*x509.Certificate, error) {
 	var tmp = make([]*x509.Certificate, 0, len(certs))
+	var local = make([]*x509.Certificate, len(certs))
 	var prev *x509.Certificate
 
-	for len(certs) > 0 {
+	copy(local, certs)
+	for len(local) > 0 {
 		var done bool
 
-		for i := range certs {
-			cand := certs[i]
+		for i := range local {
+			cand := local[i]
 			var target string
 
 			if prev == nil {
@@ -143,7 +146,7 @@ func orderCertChain(certs []*x509.Certificate) ([]*x509.Certificate, error) {
 			if cand.Issuer.CommonName == target {
 				done = true
 				tmp = append(tmp, cand)
-				certs = slice.DeleteElement(certs, i)
+				local = slice.DeleteElement(local, i)
 				prev = cand
 				break
 			}
