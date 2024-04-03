@@ -14,9 +14,15 @@ import (
 )
 
 const (
-	TypeCA   = "ca"
-	TypeTSA  = "tsa"
-	TypeTLog = "tlog"
+	TypeCA    = "ca"
+	TypeTSA   = "tsa"
+	TypeTLog  = "tlog"
+	TypeCTLog = "ctlog"
+)
+
+const (
+	RSAPKCS1v15 = "pkcs1v15"
+	RSAPSS      = "pss"
 )
 
 func Add() *ffcli.Command {
@@ -28,6 +34,7 @@ func Add() *ffcli.Command {
 		pemFile = flagset.String("pem", "", "Verifictation material to add")
 		start   = flagset.String("start", "", "Validity start time")
 		end     = flagset.String("end", "", "Validity end time")
+		padding = flagset.String("padding", "pkcs1v15", "For RSA key, the padding scheme to use. PKCS#1 v1.5 is the default, pss is also supported")
 		prevEnd = flagset.String("prev-end", "", "End time for currently valid chain")
 		verbose = flagset.Bool("verbose", false, "verbose mode")
 	)
@@ -39,7 +46,7 @@ func Add() *ffcli.Command {
 		LongHelp:   "Add a certificate chain to a CA. If no start time is set, current time is used. If no Previous end is set, the next chain's start time is used",
 		FlagSet:    flagset,
 		Exec: func(ctx context.Context, args []string) error {
-			if !(*nType == TypeCA || *nType == TypeTSA || *nType == TypeTLog) {
+			if *nType != TypeCA && *nType != TypeTSA && *nType != TypeTLog && *nType != TypeCTLog {
 				return flag.ErrHelp
 			}
 			if *uri == "" {
@@ -51,13 +58,16 @@ func Add() *ffcli.Command {
 			if *tr == "" {
 				return flag.ErrHelp
 			}
+			if *padding != RSAPKCS1v15 && *padding != RSAPSS {
+				return flag.ErrHelp
+			}
 
-			return AddCmd(*tr, *nType, *uri, *pemFile, *start, *end, *prevEnd, *verbose)
+			return AddCmd(*tr, *nType, *uri, *pemFile, *start, *end, *prevEnd, *padding, *verbose)
 		},
 	}
 }
 
-func AddCmd(trp, nType, uri, pemFile, start, end, prevEnd string, verbose bool) error {
+func AddCmd(trp, nType, uri, pemFile, start, end, prevEnd, padding string, verbose bool) error {
 	var tr ptr.TrustedRoot
 	var buf []byte
 	var prevEndTs time.Time
@@ -83,8 +93,10 @@ func AddCmd(trp, nType, uri, pemFile, start, end, prevEnd string, verbose bool) 
 		fallthrough
 	case TypeTSA:
 		err = addCA(&tr, nType, uri, pemFile, start, end, prevEndTs, verbose)
+	case TypeCTLog:
+		fallthrough
 	case TypeTLog:
-		err = fmt.Errorf("adding transparency logs is not yet supported")
+		err = addTLog(&tr, nType, uri, pemFile, start, end, prevEndTs, padding, verbose)
 	default:
 		return flag.ErrHelp
 	}
@@ -135,6 +147,43 @@ func addCA(tr *ptr.TrustedRoot, caType, uri, pemFile, start, end string,
 		tr.CertificateAuthorities = append(*ca, newCA)
 	} else {
 		tr.TimestampAuthorities = append(*ca, newCA)
+	}
+
+	return nil
+}
+
+func addTLog(tr *ptr.TrustedRoot, tlogType, uri, pemFile, start, end string,
+	prevEndTs time.Time, padding string, verbose bool) error {
+	var newtl *ptr.TransparencyLogInstance
+	var tlog *[]*ptr.TransparencyLogInstance
+	var err error
+
+	if newtl, err = newTLog(pemFile, start, end, uri, padding, verbose); err != nil {
+		return err
+	}
+
+	// Close previous entry if timestamp is open
+	if tlogType == TypeTLog {
+		tlog = &tr.Tlogs
+	} else {
+		tlog = &tr.Ctlogs
+	}
+	var last = len(*tlog) - 1
+	if last >= 0 {
+		if (*tlog)[last].PublicKey.ValidFor.End == nil {
+			if prevEndTs.IsZero() {
+				(*tlog)[last].PublicKey.ValidFor.End = newtl.PublicKey.ValidFor.Start
+			} else {
+				(*tlog)[last].PublicKey.ValidFor.End = timestamppb.New(prevEndTs)
+			}
+		}
+	}
+
+	// Add new entry
+	if tlogType == TypeTLog {
+		tr.Tlogs = append(*tlog, newtl)
+	} else {
+		tr.Ctlogs = append(*tlog, newtl)
 	}
 
 	return nil
