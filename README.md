@@ -104,10 +104,32 @@ Inspect the final result
 }
 ```
 
+The astute reader will notice that both the CT log and transparency
+log have the same public key, but were added with different keys. This
+is because the public key loaded is actually the same, but one is
+encoded with `PKCS#1` and the other with `PKIX`. During serialization
+to JSON only `PKIX` is supported, per
+[sigstore/protobuf-specs](https://github.com/sigstore/protobuf-specs)
+`PKCS#1` encoding is deprecated.
+
 ### Verify the generated trust root
 
 ```shell
 $ % ./trtool verify -f tr3.json
 $ echo $?
 0
+```
+
+In verbose mode
+```shell
+$  ./trtool verify -v -f tr3.json
+Verifying OU='Umbrella Corporation' CN='Root' of length 3
+  Loaded OU='Umbrella Corporation' CN='Fulcio Intermediate - online' CA:true MaxPathLen 0 at pos 0
+    issuer OU='Umbrella Corporation' CN='Fulcio Intermediate - offline'
+  Loaded OU='Umbrella Corporation' CN='Fulcio Intermediate - offline' CA:true MaxPathLen 1 at pos 1
+    issuer OU='Umbrella Corporation' CN='Root'
+  Loaded OU='Umbrella Corporation' CN='Root' CA:true MaxPathLen 2 at pos 2
+    issuer OU='Umbrella Corporation' CN='Root'
+------------------------------------------------------------------------
+Trusted root is valid
 ```
