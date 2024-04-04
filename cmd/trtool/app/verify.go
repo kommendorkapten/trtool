@@ -118,6 +118,12 @@ func VerifyCertChain(ca *v1.CertificateAuthority, verbose bool) bool {
 			fmt.Println("Certificate's 'not before' must be before the CA's validity time as specified in the bundle")
 			valid = false
 		}
+		// Verify that the CA's start time is not after the certificate's
+		// not before
+		if ca.ValidFor.Start.AsTime().After(c.NotAfter) {
+			fmt.Printf("Certificate's 'not after' %s must be before CA's start time %s\n",
+				c.NotAfter, ca.ValidFor.Start.AsTime())
+		}
 		// Verify that the CA's end time is not after the certificate's
 		// not after.
 		if ca.ValidFor.End != nil && ca.ValidFor.End.AsTime().After(c.NotAfter) {
