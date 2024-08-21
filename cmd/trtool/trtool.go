@@ -22,6 +22,7 @@ func main() {
 			app.Verify(),
 			app.Add(),
 			app.InitRoot(),
+			app.SCInit(),
 		},
 		Exec: func(context.Context, []string) error {
 			return flag.ErrHelp

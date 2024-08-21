@@ -50,16 +50,16 @@ func Add() *ffcli.Command {
 				return flag.ErrHelp
 			}
 			if *uri == "" {
-				return flag.ErrHelp
+				return fmt.Errorf("no uri provided: %w", flag.ErrHelp)
 			}
 			if *pemFile == "" {
-				return flag.ErrHelp
+				return fmt.Errorf("no pem file provided: %w", flag.ErrHelp)
 			}
 			if *tr == "" {
-				return flag.ErrHelp
+				return fmt.Errorf("no trusted root path provided: %w", flag.ErrHelp)
 			}
 			if *padding != RSAPKCS1v15 && *padding != RSAPSS {
-				return flag.ErrHelp
+				return fmt.Errorf("invalid RSA padding: %w", flag.ErrHelp)
 			}
 
 			return AddCmd(*tr, *nType, *uri, *pemFile, *start, *end, *prevEnd, *padding, *verbose)
