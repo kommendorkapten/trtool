@@ -44,8 +44,10 @@ func SCInit() *ffcli.Command {
 }
 
 func SCInitCmd(ca, oidc string, tlogs, tsas []string) error {
+	const mediaType = "application/vnd.dev.sigstore.signingconfig.v0.1+json"
 	var buf []byte
 	var sc = ptr.SigningConfig{
+		MediaType: mediaType,
 		CaUrl: ca,
 		OidcUrl: oidc,
 		TlogUrls: tlogs,
