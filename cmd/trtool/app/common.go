@@ -29,6 +29,11 @@ func newCertificateAuthority(pem, startStr, endStr, url string, verbose bool) (*
 	if err != nil {
 		return nil, err
 	}
+
+	if len(chain) == 0 {
+		return nil, fmt.Errorf("no certificates provided")
+	}
+
 	protoChain := make([]*pc.X509Certificate, len(chain))
 	root := chain[len(chain)-1]
 
@@ -181,7 +186,7 @@ func loadChain(p string, verbose bool) ([]*x509.Certificate, error) {
 
 	for {
 		block, rest = pem.Decode(b)
-		if len(block.Bytes) == 0 {
+		if block == nil || len(block.Bytes) == 0 {
 			break
 		}
 		c, err := x509.ParseCertificate(block.Bytes)
