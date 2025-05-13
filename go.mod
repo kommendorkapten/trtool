@@ -3,7 +3,7 @@ module github.com/kommendorkapten/trtool
 go 1.20
 
 require (
-	github.com/peterbourgon/ff/v3 v3.3.0
+	github.com/peterbourgon/ff/v3 v3.4.0
 	github.com/sigstore/protobuf-specs v0.3.3-0.20240822155708-ea7269b6033a
 	github.com/stretchr/testify v1.9.0
 	google.golang.org/protobuf v1.34.2
